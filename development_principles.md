@@ -1,0 +1,289 @@
+
+### **Development Principles (Version 8.2)**
+
+This is tailored to be used as a prompt for code generators such as Google Gemini.
+
+> Note: Section and item numbering must be kept persistent!
+---
+
+### **1. Design**
+
+*   **1.1. Use the Right Paradigm:** Use a pragmatic approach, selecting the best mechanism for the problem at hand.
+    *   **1.1.1. Encapsulation:** Provide minimal external access. Use private data when managing state or complex, multi-step logic.
+    *   **1.1.2. Composition over Inheritance:** Build complex objects by composing them from simpler ones.
+    *   **1.1.3. Functional Pipelines:** For data-centric transformations, model the process as a sequence of pure functions.
+    *   **1.1.4. Declarative Configuration over Imperative Code:** Business logic, thresholds, and other frequently tuned parameters should be defined in external configuration files rather than  hardcoded.
+       
+* **1.2. Component Design:**
+    *   **1.2.1. Separation of Concerns (SoC):** Every module, class, and function must have a single, well-defined responsibility.
+    *   **1.2.2. Dependency Injection (DI):** A component must not create or fetch its own dependencies; they must be passed in.
+    *   **1.2.3. Avoid Passed-through Data:** Do not pass parameters through intermediate functions that don't use them.
+    *   **1.2.4. Don't Repeat Yourself (DRY):** Avoid duplicating code or logic.
+
+*   **1.3. Structure and Data Flow:**
+    *   **1.3.1. Layered Design:** Structure the application in distinct layers:
+        *   **Orchestration Layer:** Coordinates the workflow; contains minimal business logic.
+        *   **Service/Logic Layer:** Implements business logic; operates on data, performs no direct I/O.
+        *   **Data Access Layer:** Handles reading from and writing to data sources.
+    *   **1.3.2. Isolate Configuration:**
+        *   **Argument Parsing:** Parse command-line arguments only at the application's entry point.
+        *   **Configuration Loading:** Use a dedicated component  to load, validate, and provide configuration. Core logic must not read config files directly.
+    *   **1.3.3. Use Schema Validators:** All human-edited configuration files (YAML, JSON) must be validated against a formal schema. The system must fail fast on invalid configuration.
+              `YMLEditor.yaml_reader  ConfigLoader` is recommended for YAML files
+    *   **1.3.4. Runtime Data Validation and Sanity Checks:** Data pipeline components that filter, transform, or enrich data must track key statistics about their operation. Upon completion, these statistics must be evaluated against expected thresholds to prevent silent failures.
+        *   **Track Key Metrics:** At a minimum, track the number of input items, items successfully processed/output, and items filtered or discarded.
+        *   **Warn on Questionable Output:** If the output statistics are unusual but not necessarily a failure (e.g., zero items were updated when some were expected), the component must log a prominent `WARNING`.
+        *   **Error on Invalid Output:** If the output indicates a definitive failure (e.g., a critical step produced zero output items), the component must raise an `ERROR` and terminate. A step in a complex
+              data pipeline must NEVER silently fail or pass bad data.
+    *   **1.3.5. Configuration Must Define Behavior (Explicit over Implicit):** The system's behavior must be explicitly controlled by its configuration, never by implicit rules hidden in the code. Avoid "magic numbers" and hidden logic.
+        *   **Principle:** All business rules, constants, and decision thresholds must be defined as parameters in a configuration file. The code should act as a generic engine that executes based on those explicit parameters.
+        *   **Extent:** This rule is to be followed even when it might degrade the user experience by adding details to configuration files.
+
+*   **1.4. General Design Goals:**
+    *   **1.4.1. Design for Testability:** Systems built with DI, SoC, and clear layers are inherently easier to test.
+    *   **1.4.2. Apply Design Patterns Strategically:** Use well-understood design patterns where they solve a known problem and improve clarity. Do not add a pattern for its own sake or for a hypothetical future problem that does not exist (YAGNI - "You Aren't Gonna Need It").
+
+---
+
+### **2. Code Style**
+
+*   **2.1. Naming:** Use specific and precise names for all packages, modules, classes, functions, and variables.
+*   **2.2. Comments:** Code should generally be self-documenting. In-line comments should only be needed to explain unusually complex sections or to highlight large processing blocks.
+*   **2.3. PEP 8:** Strictly follow PEP 8 for all Python formatting.
+*   **2.4. Order:** Place the most important classes and functions first within a module or class.
+
+*   **2.5. Docstrings:** Use Google-style docstrings for all public modules, classes, and functions. The documentation will be generated by Sphinx using the `napoleon` and `myst_parser` extensions. Docstrings must be written with this in mind.
+
+    *   **2.5.1. Module/Script Overview Docstrings:** The top-level docstring for a file must be a clear and effective summary. It should adhere to the following guidelines:
+        *   **State the Benefit First:** Begin by explaining the core problem the module solves and the value it provides.
+        *   **Use Verifiable Language:** Avoid subjective adverbs (e.g., "easily," "quickly"). The description must be objective.
+        *   **Use Active, Precise Verbs:** Describe what the code *does* using strong verbs (e.g., "calculates," "queries," "validates").
+        *   **Explain the "How," Not Just the "What":** Explain the underlying mechanism that produces the benefit (e.g., "it uses an in-memory R-tree spatial index").
+
+    *   **2.5.2. Rich Formatting and Cross-Referencing (Sphinx/MyST):** To create rich, interconnected documentation, leverage the following Sphinx and MyST Markdown features within your docstrings.
+        *   **Cross-References:** Refer to other modules, classes, or functions using Sphinx roles. This creates clickable hyperlinks in the final documentation.
+            *   **Example:** To refer to the `SpatialIndex` class, use ``:class:`~GeoTier.spatial_index.SpatialIndex```. The `~` creates a shorter link text.
+        *   **Code Blocks:** For examples of code or configuration, use fenced code blocks with language highlighting.
+            *   **Example:**
+                ````markdown
+                ```yaml
+                # Example config section
+                search_radius_meters: 150
+                ```
+                ````
+        *   **Notes and Warnings:** Use admonition directives to highlight important information.
+            *   **Example:**
+                ````markdown
+                .. note::
+                   This function assumes the input GeoDataFrame has already been
+                   reprojected to a meter-based CRS.
+                ````
+                Common directives include `.. note::`, `.. warning::`, and `.. seealso::`.
+        *   **Parameter Types:** While type hints are the primary source, you can use Sphinx roles in the `Args:` section for clarity, especially for complex types.
+            *   **Example:** `config (Dict): A dictionary conforming to the :data:`~path.to.MATCH_SCHEMA`.`
+        *   **Workflows:** Use Mermaid for workflows.
+
+    *   **2.5.3. Standard Google-Style Sections:** All public functions and methods must include standard sections as needed:
+        *   **`Args:`**: Describe each parameter, its type, and its purpose.
+        *   **`Returns:`**: Describe the function's return value and its type.
+        *   **`Raises:`**: Describe any exceptions that the function is expected to raise under specific conditions.
+        *   **`Example:`**: Provide a clear, minimal, runnable example of how to use the function.
+
+*   **2.6. Type Hinting:** Use explicit Python 3.10+ type hints (`list[str]`, `dict[str, int]`) for all function signatures and variables.
+*   **2.7. Line Length:** Maximum 99 characters per line.
+*   **2.8. Ternary Operators:** Use only for simple, clear assignments.
+*   **2.9. List Comprehensions:** Use where appropriate; provide a comment for complex implementations.
+*   **2.10. Trailing Commas:** Use a trailing comma on the last item in multi-line lists, dicts, or argument lists. This simplifies adding new items and produces a cleaner, more precise change history in source control.
+
+---
+
+### **3. Language, Libraries, & Error Handling**
+
+*   **3.1. Python Version:** All code must be compatible with Python 3.10+.
+*   **3.2. Clarity:** Prioritize writing clear, self-documenting code.
+*   **3.3. Specific Exceptions:** Raise specific, built-in (`ValueError`, `TypeError`) or custom exceptions rather than exiting in function calls.
+*   **3.4. Logging vs. Printing:**
+    *   **Library Code:** Must use the `logging` module for all diagnostic output.
+    *   **Executable Scripts:** May use `print()` for direct user-facing output.
+*   **3.4.1 Logging Levels**
+    * log.info(): For standard, high-level progress and success messages. This is the default visible output.
+      Example: "Executing Schema Setup Stage", "Updated Functions:", "✅ Success marker created"
+      log.debug(): For verbose, low-level details useful only for debugging. This is hidden by default.
+      Example: "Verifying table...", "Executing: ALTER TABLE...", "Database connection successful."
+      log.warning(): For non-critical issues that do not stop the process but should be visible to the user by default.
+      Example: "⚠️ WARNING: Missing optional prerequisite tables."
+      log.error() / log.critical(): For fatal errors that stop the execution.
+      Example: "❌ An error occurred: ...", "FATAL ERROR: Missing mandatory prerequisite tables."
+*   **3.5. Library Usage:**
+    *   **3.5.1. Leverage Libraries:** Use well-established libraries to avoid reinventing the wheel.
+    *   **3.5.2. Selection Criteria:** Libraries must be actively maintained, widely used, stable, and easily installable via `pip`.
+    *   **3.5.3. Internal Libraries:** Package and release generically useful internal modules on PyPI.
+
+---
+
+### **4. Development Processes**
+
+This section defines mandatory processes for ensuring quality and consistency.
+
+*   **[PROCESS] 4.1. Requirements Definition:**
+    *   **4.1.1.** Do not begin design or coding without clear requirements.
+    *   **4.1.2.** Use an iterative cycle: Define requirements -> Build -> Refine requirements -> Repeat.
+
+*   **[PROCESS] 4.2. Data-Driven Debugging:**
+    *   **4.2.1.** For any non-trivial defect, use a structured, evidence-based process.
+    *   **4.2.2. Hypothesis:** Form a clear, specific, and testable theory about the root cause.
+    *   **4.2.3. Data Collection:** Gather data that will validate or invalidate the hypothesis (e.g., logging, assertions, debugger).
+    *   **4.2.4. Analysis:** Analyze the collected data. If it is inconclusive or refutes the hypothesis, return to step 4.2.2 and form a new hypothesis.
+    *   **4.2.5. Solution and Generalization:** Once the data provides a conclusive diagnosis, investigate the simplest and most direct code change that solves the identified root cause. 
+    Before finalizing, consider if the root cause points to a broader, systemic issue or a flawed pattern that could be improved to prevent similar bugs in the future.
+
+*   **[PROCESS] 4.3. Environment and Version Reconciliation:**
+    *    **4.3.1.** Trigger: This process is required if a reasonable solution fails with a fundamental error (e.g., unexpected argument,
+    missing config key). This pattern suggests a potential version mismatch between the AI model and the user's environment.
+    *    **4.3.2.** Hypothesis: The primary hypothesis is an environment mismatch (e.g., the AI's knowledge of a tool's API does not match the user's installed version).
+    *    **4.3.3.** Data Collection: Ask the user to provide the precise version of the tool or library in question, including the specific command to run.
+    *    **4.3.4.** Solution: All subsequent proposals must be based on the official documentation for that specific version.
+
+---
+
+### **5. AI  Generation**
+
+These rules govern the interaction with and output from AI  generation tools.
+
+*   **5.1. Complete Snippets:** All generated code must be a complete, self-contained function, class, or module.
+*   **5.2. No Placeholders:** Do not use placeholders (e.g., `...`, `// your code here`) in the middle of a code block.
+*   **5.3. Iterative Language:** Avoid using words such as "final"/"definitive" to describe code; instead, describe its current state.  Coding is 
+always iterative not final.
+*   **5.4. Feature Preservation:** Do not remove, disable, or bypass existing functionality unless explicitly requested. The preservation of existing 
+capabilities is a primary requirement.
+*   **5.5. Accurate Code Representation:** [PROCESS] This process governs how the AI must introduce code blocks to ensure an accurate representation 
+of their completeness.
+*   **5.5.1. Pre-Response Check:** After generating a code block but before writing the introductory sentence, a mandatory internal check must be performed.
+*   **5.5.2. Scan for Ellipses:** The generated code block must be scanned for these specific patterns: # ... or ....
+*   **5.5.3. Set Completeness Flag:** An internal flag, is_complete, must be set to True if no ellipses are found, and False otherwise.
+*   **5.5.4. Select Introductory Sentence:** The introductory sentence for the code block MUST be chosen from the appropriate list below, based on 
+the state of the is_complete flag. No other introductory phrases are permitted.
+If is_complete is True (no ellipses found), the sentence MUST be one of the following:
+"Here is the complete and updated file:"
+"Here is the full implementation of the class:"
+"Here is the complete code for the function:"
+If is_complete is False (ellipses were found), the sentence MUST be one of the following:
+"Here are the updated sections of the file. Unchanged code has been omitted for brevity with ...:"
+"Here are the relevant changes to the code. Unchanged sections are indicated with ...:"
+"Here is the updated code with unchanged methods omitted using ...:"
+Rationale: This strict process eliminates ambiguity and prevents the misrepresentation of partial code snippets as complete solutions.
+---
+
+*   **5.6. Valid JSON Generation**
+    ** 5.6. Valid JSON Output and Annotation:** [PROCESS] This process governs the generation of JSON data to ensure it does not
+include comments which are illegal in JSON.
+    *   **5.6.1. Mandatory Syntax Validation:** After generation and before presentation, a mandatory internal check must be performed to confirm 
+    the absence of all non-standard elements, including but not limited to:
+        *   JavaScript-style comments (`// ...` or `/* ... */`)
+        *   Python-style comments (`# ...`)
+    *   **5.6.2. Out-of-Band Annotation:** All explanatory text, including rationale for changes, comments on specific values, or 
+    other annotations, MUST be placed in a separate, clearly demarcated section of text. This annotation section MUST be positioned 
+    entirely outside of (typically following) the JSON code block.
+
+*   **5.7. Partial Implementation:** Use a "TODO" comment to flag any areas that are not fully implemented.
+
+## **6. Testing, Performance & Quality Assurance** 
+
+* **6.1. Unit Tests:** Every function/class should be tested with `pytest`.
+* **6.2. Mocking & Fixtures:** Use pytest fixtures and mocking for external dependencies.
+
+---
+
+## **7. CI/CD & Deployment** 
+
+* **7.1. Linting & Formatting:** Run `black`, `flake8`, `mypy` in CI.
+* **7.2. Git Commit Messages:** Use Conventional Commit structured format for commit messages.  
+  `<type>(<scope>): <subject>`
+
+*   **`<type>`:** A short keyword describing the *kind* of change. This is the most important part.
+    *   `feat`: A new feature for the user. (Corresponds to a `Minor` version bump in SemVer).
+    *   `fix`: A bug fix for the user. (Corresponds to a `Patch` version bump).
+    *   `docs`: Changes to documentation only.
+    *   `style`: Formatting changes, white space, etc.
+    *   `refactor`: A code change that neither fixes a bug nor adds a feature.
+    *   `test`: Adding missing tests or correcting existing tests.
+    *   `chore`: Changes to the build process or auxiliary tools.
+    *   **`BREAKING CHANGE`:** A commit that has a footer `BREAKING CHANGE:` introduces a breaking API change and corresponds to a `Major` version bump.
+
+*   **`<scope>` (Optional):** A noun describing the section of the codebase affected (e.g., `(parser)`, `(scoring)`).
+*   **`<subject>`:** A short, imperative-mood description of the change.
+
+Examples:
+refactor(database): extract connection logic into ConnectionManager class
+style(utils): fix indentation and trailing commas
+---
+
+## **8. Security & Compliance** 
+
+* **8.1. Input Validation:** Never trust external input.
+* **8.2. Secrets Management:** No secrets in code/config. Use environment variables or vaults.
+* **8.3. Dependencies:** Regularly scan with `pip-audit` or similar.
+* **8.4. Data Privacy:** Ensure compliance with GDPR/CCPA where applicable.
+
+---
+
+## **9. Documentation & Communication** 
+
+* **9.1. README Files:** Every package must include usage examples.
+* **9.2. Change Logs:** Maintain `CHANGELOG.md` for version history.
+
+---
+## **10. GUI Development Principles**
+
+These principles apply to the development of graphical user interface applications. The goal is to create applications that are 
+intuitive, maintainable, robust, and visually polished.
+
+### **10.1. GUI Stack**
+
+*   **10.1.1. Use PySide 6:** All  Python GUI applications must use the latest stable version of PySide (currently PySide 6).
+
+### **10.2. Component Structure**
+
+*   **10.2.1. Separation of Concerns: Instantiation, Layout, and Signals:** A widget's code must be organized into three distinct, dedicated methods to
+ensure clarity and maintainability.
+    *   **`__init__(self)`:** Responsible only for creating and instantiating child widgets and member variables.
+    *   **`_setup_ui(self)`:** Responsible only for arranging the pre-created widgets into layouts.
+    *   **`_connect_signals(self)`:** Responsible only for connecting widget signals to their corresponding slots (handler methods).
+*   **10.2.2. Create Widgets First, Arrange Second:** Within the structure above, all widget objects must be created in `__init__`. The `_setup_ui` method should then arrange these existing objects. Do not mix instantiation and layout logic.
+    *   **Benefit:** This makes `_setup_ui` a clean, declarative block of code describing the visual structure. It is much easier to read and modify the layout when it is not interleaved with object creation.
+
+### **10.3. Naming and Readability**
+
+*   **10.3.1. Name by Function, Not by Placement:** UI elements must be named according to their *purpose*, not their visual location.
+    *   **Benefit:** This decouples logic from visual design, allowing the UI to be rearranged in `_setup_ui` without needing to rename variables 
+    or break signal-slot connections.
+
+### **10.4. Layout and Design**
+
+*   **10.4.1. Strive for "Pixel-Perfect" Layouts:** The visual arrangement of widgets must be deliberate and polished. Pay close attention to detail 
+to create a clean, professional appearance.
+    *   **Use Spacers:** Use `addSpacing()` in layouts to create intentional vertical or horizontal gaps that improve readability and group 
+    related controls.
+    *   **Set Margins:** Use `setContentsMargins()` on layouts and widgets to provide adequate "breathing room" around content and prevent UI 
+    elements from feeling cramped.
+
+*   **10.4.2. Employ Responsive Design:** Layouts must be designed to resize strategically and remain usable across different window sizes and screen 
+resolutions.
+    *   **Use Stretch Factors:** Use `addStretch()` and stretch factors in `addWidget()` to control how extra space is distributed. This prevents 
+    widgets from scattering or resizing awkwardly.
+    *   **Set Size Policies:** Use `setSizePolicy()` to give strong hints to the layout manager about which widgets should expand (`Expanding`) and 
+    which should maintain a fixed size (`Fixed` or `Preferred`).
+
+*   **10.4.3. Use Tabs for Complexity:** For applications with multiple distinct contexts, use a `QTabWidget` to organize functionality and 
+avoid overwhelming the user.
+
+*   **10.4.4. Prefer Toolbars and Buttons over Menus:** For primary application actions, prefer `QToolBar` or explicit `QPushButton` layouts over 
+a traditional `QMenuBar`. They provide a more direct, visible, and cross-platform-consistent user experience.
+
+### **10.5. Styling and Theming**
+
+*   **10.5.1. Respect System Light and Dark Modes:** GUI applications usually automatically adapt to the host OS theme. Custom styling must not break 
+this behavior.
+    *   **Rule:** When overriding colors via stylesheets, you must be theme-aware. 
+    *   **Implementation:** If custom colors are required, the application must detect the system theme at startup and select a compatible color 
+    palette. Never hardcode single colors (e.g., `color: black;`) that will become unreadable in a different theme.
