@@ -231,7 +231,6 @@ style(utils): fix indentation and trailing commas
 
 * **9.1. README Files:** Every package must include usage examples.
 * **9.2. Change Logs:** Maintain `CHANGELOG.md` for version history.
-
 ---
 ## **10. GUI Development Principles**
 
